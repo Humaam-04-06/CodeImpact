@@ -27,13 +27,25 @@ export async function scanWorkspace(workspacePath: string): Promise<{
   total_edges: number;
   symbols: SymbolNode[];
 }> {
-  const res = await fetch(`${API_BASE}/api/scan`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ workspace_path: workspacePath }),
-  });
-  if (!res.ok) throw new Error("Scan failed");
-  return res.json();
+  try {
+    const res = await fetch(`${API_BASE}/api/scan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspace_path: workspacePath }),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Scan failed with HTTP status ${res.status}`);
+    }
+    return res.json();
+  } catch (err: any) {
+    if (err.message && err.message.includes("Failed to fetch")) {
+      throw new Error(
+        "Cannot connect to CodeImpact backend on port 8000. Please start the backend server: backend\\venv\\Scripts\\python -m uvicorn backend.main:app --port 8000"
+      );
+    }
+    throw err;
+  }
 }
 
 export async function fetchSymbols(): Promise<{
@@ -120,16 +132,25 @@ export async function uploadProjectZip(
     formData.append("project_name", projectName);
   }
 
-  const res = await fetch(`${API_BASE}/api/upload-project`, {
-    method: "POST",
-    body: formData,
-  });
+  try {
+    const res = await fetch(`${API_BASE}/api/upload-project`, {
+      method: "POST",
+      body: formData,
+    });
 
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Failed to upload and analyze project archive");
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Failed to analyze project archive (HTTP ${res.status})`);
+    }
+
+    return res.json();
+  } catch (err: any) {
+    if (err.message && err.message.includes("Failed to fetch")) {
+      throw new Error(
+        "Cannot connect to CodeImpact backend on port 8000. Please start the backend server: backend\\venv\\Scripts\\python -m uvicorn backend.main:app --port 8000"
+      );
+    }
+    throw err;
   }
-
-  return res.json();
 }
 

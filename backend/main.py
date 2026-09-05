@@ -31,22 +31,56 @@ state: Dict[str, Any] = {
 }
 
 def load_workspace(target_path: str):
-    if not os.path.exists(target_path):
-        raise HTTPException(status_code=404, detail=f"Workspace path not found: {target_path}")
+    # 1. Clean quotes and whitespace (e.g. Windows "Copy as path" produces quotes)
+    cleaned_path = target_path.strip().strip('"').strip("'").strip()
+    
+    # 2. Normalize path and expand user home directory
+    norm_path = os.path.normpath(os.path.expanduser(cleaned_path))
+    resolved_path = norm_path
+    if not os.path.exists(resolved_path):
+        resolved_path = os.path.abspath(norm_path)
 
-    symbols = state["parser"].scan_directory(target_path)
+    # 3. Path existence check
+    if not os.path.exists(resolved_path):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Directory path not found on your system: '{cleaned_path}'. Please verify the path exists."
+        )
+
+    # 4. If user pointed to a .zip archive on disk, auto-extract it
+    if os.path.isfile(resolved_path) and resolved_path.lower().endswith(".zip"):
+        clean_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', Path(resolved_path).stem)
+        extract_dir = os.path.join("uploaded_projects", f"{clean_name}_{int(time.time())}")
+        os.makedirs(extract_dir, exist_ok=True)
+        with zipfile.ZipFile(resolved_path, 'r') as z:
+            z.extractall(extract_dir)
+        resolved_path = extract_dir
+
+    # 5. If user pointed to a single source code file, use its parent directory
+    elif os.path.isfile(resolved_path):
+        resolved_path = os.path.dirname(resolved_path)
+
+    # 6. Parse symbols via Tree-Sitter AST parser
+    symbols = state["parser"].scan_directory(resolved_path)
+    if len(symbols) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No supported source code files (.cs, .ts, .tsx, .js, .jsx, .py) were found in '{cleaned_path}'. Please select a project folder containing C#, TypeScript, JavaScript, or Python files."
+        )
+
     ckg = CodeKnowledgeGraph()
     ckg.build_from_symbols(symbols)
     analyzer = BlastRadiusAnalyzer(ckg)
 
-    state["workspace_dir"] = target_path
+    formatted_path = resolved_path.replace("\\", "/")
+    state["workspace_dir"] = formatted_path
     state["symbols"] = symbols
     state["ckg"] = ckg
     state["analyzer"] = analyzer
     state["is_scanned"] = True
 
     return {
-        "workspace": target_path,
+        "workspace": formatted_path,
         "total_symbols": len(symbols),
         "total_edges": ckg.graph.number_of_edges(),
         "symbols": symbols
@@ -198,24 +232,32 @@ async def upload_project(
 
     try:
         content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty (0 bytes).")
+            
         with zipfile.ZipFile(io.BytesIO(content)) as z:
             abs_target = os.path.abspath(target_dir)
             for member in z.infolist():
-                extracted_dest = os.path.abspath(os.path.join(target_dir, member.filename))
+                member_clean = member.filename.lstrip("/\\").replace("\\", "/")
+                if not member_clean or member_clean.endswith("/"):
+                    continue
+                extracted_dest = os.path.abspath(os.path.join(target_dir, member_clean))
                 if not extracted_dest.startswith(abs_target):
                     raise HTTPException(status_code=400, detail="Invalid zip: detected path traversal attempt.")
-            z.extractall(target_dir)
+                os.makedirs(os.path.dirname(extracted_dest), exist_ok=True)
+                with z.open(member) as src, open(extracted_dest, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
     except zipfile.BadZipFile:
-        raise HTTPException(status_code=400, detail="Corrupt or invalid zip archive.")
+        raise HTTPException(status_code=400, detail="Corrupt or invalid zip archive. Please ensure it is a standard zip file.")
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to extract zip archive: {str(e)}")
 
     # Check if files were extracted inside a single root folder (e.g. repo-main/)
-    entries = os.listdir(target_dir)
-    subdirs = [os.path.join(target_dir, e) for e in entries if os.path.isdir(os.path.join(target_dir, e))]
-    subfiles = [os.path.join(target_dir, e) for e in entries if os.path.isfile(os.path.join(target_dir, e))]
+    entries = [os.path.join(target_dir, e) for e in os.listdir(target_dir)]
+    subdirs = [e for e in entries if os.path.isdir(e) and not os.path.basename(e).startswith("__MACOSX")]
+    subfiles = [e for e in entries if os.path.isfile(e) and not os.path.basename(e).startswith(".")]
 
     scan_root = target_dir
     if len(subdirs) == 1 and len(subfiles) == 0:

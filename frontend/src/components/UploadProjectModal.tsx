@@ -1,7 +1,7 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { ICONS } from "../utils/icons";
-import { uploadProjectZip, scanWorkspace } from "../services/api";
+import { uploadProjectZip, scanWorkspace, fetchHealth } from "../services/api";
 import type { ProjectSample, SymbolNode } from "../types/impact";
 
 interface UploadProjectModalProps {
@@ -22,8 +22,17 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isBackendOnline, setIsBackendOnline] = useState<boolean | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Check backend server status when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setErrorMsg(null);
+      fetchHealth()
+        .then(() => setIsBackendOnline(true))
+        .catch(() => setIsBackendOnline(false));
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -72,7 +81,7 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
 
   const handleUploadZip = async () => {
     if (!selectedFile) {
-      setErrorMsg("Please select a .zip archive to upload.");
+      setErrorMsg("Please select a .zip archive file to upload.");
       return;
     }
 
@@ -80,21 +89,25 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
     setErrorMsg(null);
 
     try {
-      const res = await uploadProjectZip(selectedFile, projectName);
+      const res = await uploadProjectZip(selectedFile, projectName.trim());
       if (res.success && res.sample) {
         onProjectLoaded(res.sample, res.symbols);
         onClose();
       }
     } catch (err: any) {
-      setErrorMsg(err.message || "Failed to upload and scan project.");
+      setErrorMsg(err.message || "Failed to upload and scan project archive.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleScanPath = async () => {
-    if (!localPath.trim()) {
-      setErrorMsg("Please provide a valid local directory path.");
+  const handleScanPath = async (overridePath?: string) => {
+    const rawPath = overridePath || localPath;
+    // Strip quotes and trim whitespace (Windows 'Copy as path' adds quotes)
+    const cleanPath = rawPath.trim().replace(/^["']|["']$/g, "").trim();
+
+    if (!cleanPath) {
+      setErrorMsg("Please enter or paste a valid directory path.");
       return;
     }
 
@@ -102,13 +115,13 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
     setErrorMsg(null);
 
     try {
-      const res = await scanWorkspace(localPath.trim());
-      const baseName = localPath.trim().replace(/\\/g, "/").split("/").pop() || "Custom Project";
+      const res = await scanWorkspace(cleanPath);
+      const baseName = cleanPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() || "Custom Project";
       const customSample: ProjectSample = {
         id: `custom_${Date.now()}`,
         name: `📁 ${baseName}`,
         language: "Auto-Detected",
-        path: localPath.trim().replace(/\\/g, "/"),
+        path: cleanPath.replace(/\\/g, "/"),
         description: `Local project: ${res.total_symbols} symbols, ${res.total_edges} dependencies.`
       };
       onProjectLoaded(customSample, res.symbols);
@@ -141,17 +154,32 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <FontAwesomeIcon icon={ICONS.close} className="text-sm" />
           </button>
         </div>
 
+        {/* Backend Server Offline Alert Banner */}
+        {isBackendOnline === false && (
+          <div className="px-6 py-2.5 bg-amber-500/10 border-b border-amber-500/30 text-amber-300 text-xs flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <FontAwesomeIcon icon={ICONS.danger} className="text-amber-400 shrink-0" />
+              <span>
+                Backend server is offline! Run:{" "}
+                <code className="bg-slate-950 px-1.5 py-0.5 rounded text-[11px] font-mono text-amber-200">
+                  backend\venv\Scripts\python -m uvicorn backend.main:app --port 8000
+                </code>
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Tab Selection */}
         <div className="flex border-b border-slate-800 bg-slate-950/40 px-6 pt-3 gap-4">
           <button
             onClick={() => { setActiveTab("zip"); setErrorMsg(null); }}
-            className={`pb-2.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
+            className={`pb-2.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
               activeTab === "zip"
                 ? "border-cyan-500 text-cyan-400"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -162,7 +190,7 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
           </button>
           <button
             onClick={() => { setActiveTab("path"); setErrorMsg(null); }}
-            className={`pb-2.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
+            className={`pb-2.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
               activeTab === "path"
                 ? "border-purple-500 text-purple-400"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -178,19 +206,26 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
           {errorMsg && (
             <div className="px-3.5 py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2.5">
               <FontAwesomeIcon icon={ICONS.danger} className="text-xs shrink-0" />
-              <span>{errorMsg}</span>
+              <span className="leading-relaxed">{errorMsg}</span>
             </div>
           )}
 
           {activeTab === "zip" ? (
             <div className="space-y-4">
-              {/* Drag and Drop Zone */}
-              <div
+              {/* Native Accessible Drag & Drop Label */}
+              <input
+                id="modal-zip-input"
+                type="file"
+                accept=".zip"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <label
+                htmlFor="modal-zip-input"
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all ${
+                className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all block ${
                   isDragging
                     ? "border-cyan-400 bg-cyan-950/20 scale-[0.99]"
                     : selectedFile
@@ -198,15 +233,7 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
                     : "border-slate-700/80 bg-slate-950/40 hover:border-slate-600 hover:bg-slate-950/60"
                 }`}
               >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".zip"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-
-                <div className="w-12 h-12 rounded-2xl bg-slate-800/80 flex items-center justify-center mb-3 text-cyan-400 shadow-inner">
+                <div className="w-12 h-12 rounded-2xl bg-slate-800/80 flex items-center justify-center mb-3 text-cyan-400 shadow-inner mx-auto">
                   <FontAwesomeIcon
                     icon={selectedFile ? ICONS.check : ICONS.upload}
                     className={`text-xl ${selectedFile ? "text-emerald-400" : "text-cyan-400"}`}
@@ -229,7 +256,7 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
                       Drag &amp; drop your project <code className="text-cyan-400">.zip</code> here
                     </p>
                     <p className="text-xs text-slate-400 m-0 mt-1">
-                      or click to browse from your computer
+                      or click anywhere in this box to browse
                     </p>
                     <div className="flex items-center justify-center gap-2 mt-3 text-[11px] text-slate-500">
                       <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">C# (.cs)</span>
@@ -239,7 +266,7 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
                     </div>
                   </div>
                 )}
-              </div>
+              </label>
 
               {/* Project Name (Optional) */}
               <div>
@@ -250,7 +277,7 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
                   type="text"
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
-                  placeholder="e.g. My Next.js Web App or Payment Gateway"
+                  placeholder="e.g. My Next.js Web App or Payment Service"
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
                 />
               </div>
@@ -259,29 +286,57 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Full Local Directory Path
+                  Full Local Directory or File Path
                 </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={localPath}
-                    onChange={(e) => setLocalPath(e.target.value)}
-                    placeholder="e.g. D:\Projects\MyService or C:\Users\name\source\repos\OrderApi"
-                    className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 font-mono transition-colors"
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={localPath}
+                  onChange={(e) => setLocalPath(e.target.value)}
+                  placeholder="e.g. D:\Projects\MyService or C:\Users\name\Desktop\Project.zip"
+                  className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 font-mono transition-colors"
+                />
                 <p className="text-[11px] text-slate-500 mt-1.5">
-                  Paste the absolute or relative path to any project folder on your computer. CodeImpact will scan all source files recursively.
+                  Supports absolute paths, relative paths, folder paths, or direct paths to <code className="text-slate-400">.zip</code> files. Surrounding quotes from Windows "Copy as path" are automatically handled.
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1.5">
-                <p className="text-xs font-semibold text-slate-300 m-0">What CodeImpact does:</p>
-                <ul className="text-xs text-slate-400 space-y-1 pl-4 list-disc m-0">
-                  <li>Traverses directory while respecting <code className="text-slate-300">node_modules</code>, <code className="text-slate-300">.git</code>, and <code className="text-slate-300">bin/obj</code>.</li>
-                  <li>Extracts functions, controllers, DB queries, and unit tests via Tree-sitter.</li>
-                  <li>Builds full Code Knowledge Graph (CKG) and computes blast radii.</li>
-                </ul>
+              {/* 1-Click Quick Test Buttons */}
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  ⚡ 1-Click Test Paths:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLocalPath("sample_projects/csharp_ecommerce");
+                      handleScanPath("sample_projects/csharp_ecommerce");
+                    }}
+                    className="px-2.5 py-1 text-[11px] rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
+                  >
+                    C# E-Commerce
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLocalPath("sample_projects/ts_saas_api");
+                      handleScanPath("sample_projects/ts_saas_api");
+                    }}
+                    className="px-2.5 py-1 text-[11px] rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
+                  >
+                    TypeScript SaaS
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLocalPath("sample_projects/python_ai_service");
+                      handleScanPath("sample_projects/python_ai_service");
+                    }}
+                    className="px-2.5 py-1 text-[11px] rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
+                  >
+                    Python AI Service
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -292,15 +347,15 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
           >
             Cancel
           </button>
 
           <button
-            onClick={activeTab === "zip" ? handleUploadZip : handleScanPath}
+            onClick={activeTab === "zip" ? handleUploadZip : () => handleScanPath()}
             disabled={isLoading || (activeTab === "zip" ? !selectedFile : !localPath.trim())}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white shadow-md shadow-cyan-600/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white shadow-md shadow-cyan-600/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
             {isLoading ? (
               <>
