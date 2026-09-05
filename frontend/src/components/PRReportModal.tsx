@@ -225,7 +225,7 @@ export const PRReportModal: React.FC<PRReportModalProps> = ({
             onClick={handleDownloadJSON}
             className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition-colors"
           >
-            <FontAwesomeIcon icon={ICONS.fileCode || ICONS.code} className="text-xs" />
+            <FontAwesomeIcon icon={ICONS.model} className="text-xs" />
             <span>Download JSON Audit</span>
           </button>
 

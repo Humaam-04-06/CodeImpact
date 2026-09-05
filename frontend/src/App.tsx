@@ -6,6 +6,7 @@ import { Sidebar } from "./components/Sidebar";
 import { ImpactHUD } from "./components/ImpactHUD";
 import { GraphView } from "./components/GraphView";
 import { CodeSandbox } from "./components/CodeSandbox";
+import { PRReportModal } from "./components/PRReportModal";
 import type {
   SymbolNode,
   BlastReport,
@@ -30,6 +31,7 @@ export const App: React.FC = () => {
   const [isGraphLoading, setIsGraphLoading] = useState<boolean>(false);
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"graph" | "sandbox" | "callers">("graph");
+  const [isPRModalOpen, setIsPRModalOpen] = useState<boolean>(false);
 
   // Fetch graph data from backend
   const refreshGraph = useCallback(async (targetId?: string) => {
@@ -150,7 +152,7 @@ export const App: React.FC = () => {
         onSelectSample={handleSelectSample}
         onRescan={handleRescan}
         isScanning={isScanning}
-        onOpenPRModal={() => {}}
+        onOpenPRModal={() => setIsPRModalOpen(true)}
         targetSymbolId={selectedSymbol?.id}
       />
 
@@ -293,6 +295,14 @@ export const App: React.FC = () => {
           </div>
         </main>
       </div>
+
+      {/* GitHub PR Blast Radius Card Modal */}
+      <PRReportModal
+        isOpen={isPRModalOpen}
+        onClose={() => setIsPRModalOpen(false)}
+        symbolId={selectedSymbol?.id || null}
+        report={report}
+      />
     </div>
   );
 };
