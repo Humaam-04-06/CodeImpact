@@ -98,11 +98,24 @@ class ProjectSample(BaseModel):
     path: str
     description: str
 
+from fastapi.responses import RedirectResponse, Response
+
 # -----------------------------------------------------------------------------
 # API Endpoints
 # -----------------------------------------------------------------------------
+@app.get("/", include_in_schema=False)
+def root_redirect():
+    """Redirect root traffic directly to interactive Swagger API documentation."""
+    return RedirectResponse(url="/docs")
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    """Returns 204 No Content for browser favicon requests to avoid 404 console errors."""
+    return Response(status_code=204)
+
 @app.get("/api/health")
 def health_check():
+
     return {
         "status": "healthy",
         "service": "CodeImpact Engine",
