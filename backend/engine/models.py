@@ -39,6 +39,7 @@ class SymbolNode(BaseModel):
     http_route: Optional[str] = None
     is_db_operation: bool = False
     is_test: bool = False
+    language: str = "generic"
     source_code: str = ""
     calls: List[CallSite] = Field(default_factory=list)
 

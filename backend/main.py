@@ -301,17 +301,8 @@ def get_graph_data(target_symbol: Optional[str] = Query(None)):
         "total_edges": len(edges)
     }
 
-@app.post("/api/export-report")
-def export_pr_report(req: ExportReportRequest):
-    """Generates a GitHub-flavored Markdown Blast Radius Card ready for PR comments."""
-    if not state["is_scanned"]:
-        load_workspace(state["workspace_dir"])
-
-    analyzer: BlastRadiusAnalyzer = state["analyzer"]
-    report = analyzer.analyze_impact(req.symbol_id)
-    if not report:
-        raise HTTPException(status_code=404, detail=f"Symbol '{req.symbol_id}' not found.")
-
+def generate_pr_markdown(report: BlastReport, pr_title: str = "Feature / Refactoring Update", author: str = "Developer") -> str:
+    """Formats a BlastReport into a GitHub-flavored Markdown PR Card."""
     severity_badge = {
         "CRITICAL": "🔴 **CRITICAL RISK**",
         "HIGH": "🟠 **HIGH RISK**",
@@ -321,6 +312,7 @@ def export_pr_report(req: ExportReportRequest):
 
     md = f"""### 🛡️ CodeImpact — Blast Radius & Dependency Impact Report
 
+**Pull Request**: `{pr_title}` (by @{author})  
 **Target Changed**: `{report.target_id}` (`{report.target_file}`)  
 **Risk Score**: `{report.blast_score} / 100` — {severity_badge}
 
@@ -357,7 +349,21 @@ def export_pr_report(req: ExportReportRequest):
         for u in report.untested_paths:
             md += f"> - `{u}`\n"
 
-    md += f"\n_Generated automatically by CodeImpact for PR: {req.pr_title}_"
+    md += f"\n_Generated automatically by CodeImpact for PR: {pr_title}_"
+    return md
+
+@app.post("/api/export-report")
+def export_pr_report(req: ExportReportRequest):
+    """Generates a GitHub-flavored Markdown Blast Radius Card ready for PR comments."""
+    if not state["is_scanned"]:
+        load_workspace(state["workspace_dir"])
+
+    analyzer: BlastRadiusAnalyzer = state["analyzer"]
+    report = analyzer.analyze_impact(req.symbol_id)
+    if not report:
+        raise HTTPException(status_code=404, detail=f"Symbol '{req.symbol_id}' not found.")
+
+    md = generate_pr_markdown(report, pr_title=req.pr_title or "Feature / Refactoring Update", author=req.author or "Developer")
 
     return {
         "symbol_id": req.symbol_id,

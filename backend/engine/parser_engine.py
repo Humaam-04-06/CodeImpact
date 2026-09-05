@@ -242,6 +242,7 @@ class ASTParserEngine:
             http_route=http_route,
             is_db_operation=is_db_op,
             is_test=is_test,
+            language="csharp",
             source_code=source_code,
             calls=calls,
         )
@@ -354,6 +355,7 @@ class ASTParserEngine:
                             symbol_type=st,
                             class_name=class_name,
                             parameters=parameters,
+                            language="typescript" if rel_path.endswith((".ts", ".tsx")) else "javascript",
                             source_code="\n".join(lines[start_line - 1 : end_line]),
                             calls=calls,
                         )
@@ -462,6 +464,7 @@ class ASTParserEngine:
                             symbol_type=st,
                             class_name=class_name,
                             parameters=parameters,
+                            language="python",
                             source_code="\n".join(lines[start_line - 1 : end_line]),
                             calls=calls,
                         )
