@@ -1,3 +1,5 @@
+import io
+import zipfile
 from fastapi.testclient import TestClient
 from backend.main import app
 
@@ -77,3 +79,49 @@ def test_ts_saas_scan():
     assert res.status_code == 200
     data = res.json()
     assert data["total_symbols"] >= 4
+
+def test_upload_project_zip():
+    import io
+    import zipfile
+    
+    # Create in-memory zip archive containing a sample Python service
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as z:
+        py_code = """
+class CalculatorService:
+    def add(self, a: int, b: int) -> int:
+        return a + b
+
+    def compute_total(self, items: list) -> int:
+        return self.add(10, 20)
+"""
+        z.writestr("calc_service.py", py_code)
+    
+    zip_buffer.seek(0)
+    
+    res = client.post(
+        "/api/upload-project",
+        files={"file": ("calculator_app.zip", zip_buffer, "application/zip")},
+        data={"project_name": "Calculator Microservice"}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert "Calculator Microservice" in data["sample"]["name"]
+    assert data["total_symbols"] >= 2
+    
+    # Verify it appears in GET /api/samples
+    samples_res = client.get("/api/samples")
+    assert samples_res.status_code == 200
+    samples = samples_res.json()
+    assert any("Calculator Microservice" in s["name"] for s in samples)
+
+def test_upload_invalid_file():
+    # Attempt to upload a non-zip file
+    res = client.post(
+        "/api/upload-project",
+        files={"file": ("invalid_text.txt", io.BytesIO(b"Hello world"), "text/plain")}
+    )
+    assert res.status_code == 400
+    assert "Only .zip archive files are supported" in res.json()["detail"]
+

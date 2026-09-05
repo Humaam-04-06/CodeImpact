@@ -47,3 +47,4 @@ pnpm-debug.log*
 *.swo
 .DS_Store
 Thumbs.db
+uploaded_projects/

@@ -1,9 +1,14 @@
 import os
+import io
+import re
+import time
+import zipfile
+import shutil
 from typing import List, Optional, Dict, Any
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -123,37 +128,141 @@ def health_check():
         "symbols_loaded": len(state["symbols"])
     }
 
+DEFAULT_SAMPLES: List[ProjectSample] = [
+    ProjectSample(
+        id="csharp_ecommerce",
+        name="C# E-Commerce Microservice",
+        language="C# (.cs)",
+        path="sample_projects/csharp_ecommerce",
+        description="UserService, OrderService, PaymentService, AuthController, and Db Repositories."
+    ),
+    ProjectSample(
+        id="ts_saas_api",
+        name="TypeScript Cloud Billing SaaS",
+        language="TypeScript (.ts)",
+        path="sample_projects/ts_saas_api",
+        description="SubscriptionService, BillingController, PaymentGateway, and Unit Tests."
+    ),
+    ProjectSample(
+        id="python_ai_service",
+        name="Python AI Sentiment Microservice",
+        language="Python (.py)",
+        path="sample_projects/python_ai_service",
+        description="ModelService, ApiController, DbLogger, and Unit Tests."
+    )
+]
+
+user_projects: List[ProjectSample] = []
+
 @app.get("/api/samples", response_model=List[ProjectSample])
 def list_samples():
-    """Returns preloaded sample projects for instant 1-click demonstration."""
-    return [
-        ProjectSample(
-            id="csharp_ecommerce",
-            name="C# E-Commerce Microservice",
-            language="C# (.cs)",
-            path="sample_projects/csharp_ecommerce",
-            description="UserService, OrderService, PaymentService, AuthController, and Db Repositories."
-        ),
-        ProjectSample(
-            id="ts_saas_api",
-            name="TypeScript Cloud Billing SaaS",
-            language="TypeScript (.ts)",
-            path="sample_projects/ts_saas_api",
-            description="SubscriptionService, BillingController, PaymentGateway, and Unit Tests."
-        ),
-        ProjectSample(
-            id="python_ai_service",
-            name="Python AI Sentiment Microservice",
-            language="Python (.py)",
-            path="sample_projects/python_ai_service",
-            description="ModelService, ApiController, DbLogger, and Unit Tests."
-        )
-    ]
+    """Returns all available sample projects plus any user-uploaded or scanned projects."""
+    return user_projects + DEFAULT_SAMPLES
 
 @app.post("/api/scan")
 def scan_workspace(req: ScanRequest):
     """Parses a project directory, builds the Code Knowledge Graph, and returns extracted symbols."""
-    return load_workspace(req.workspace_path)
+    result = load_workspace(req.workspace_path)
+    
+    # Auto-register newly scanned custom directory into user_projects if not known
+    normalized_path = req.workspace_path.replace("\\", "/").rstrip("/")
+    known_paths = {s.path.replace("\\", "/").rstrip("/") for s in (DEFAULT_SAMPLES + user_projects)}
+    if normalized_path not in known_paths:
+        base_name = os.path.basename(normalized_path) or "Custom Project"
+        user_projects.insert(0, ProjectSample(
+            id=f"custom_{int(time.time())}",
+            name=f"📁 {base_name}",
+            language="Auto-Detected",
+            path=normalized_path,
+            description=f"Local codebase: {result['total_symbols']} symbols, {result['total_edges']} dependencies."
+        ))
+        
+    return result
+
+@app.post("/api/upload-project")
+async def upload_project(
+    file: UploadFile = File(...),
+    project_name: Optional[str] = Form(None)
+):
+    """
+    Accepts a project .zip archive, safely unzips it into uploaded_projects/,
+    scans it with the AST parser engine, constructs the Code Knowledge Graph,
+    and returns parsed symbols and metrics.
+    """
+    if not file.filename or not file.filename.lower().endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Only .zip archive files are supported.")
+
+    clean_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', Path(file.filename).stem)
+    target_dir = os.path.join("uploaded_projects", f"{clean_name}_{int(time.time())}")
+    os.makedirs(target_dir, exist_ok=True)
+
+    try:
+        content = await file.read()
+        with zipfile.ZipFile(io.BytesIO(content)) as z:
+            abs_target = os.path.abspath(target_dir)
+            for member in z.infolist():
+                extracted_dest = os.path.abspath(os.path.join(target_dir, member.filename))
+                if not extracted_dest.startswith(abs_target):
+                    raise HTTPException(status_code=400, detail="Invalid zip: detected path traversal attempt.")
+            z.extractall(target_dir)
+    except zipfile.BadZipFile:
+        raise HTTPException(status_code=400, detail="Corrupt or invalid zip archive.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to extract zip archive: {str(e)}")
+
+    # Check if files were extracted inside a single root folder (e.g. repo-main/)
+    entries = os.listdir(target_dir)
+    subdirs = [os.path.join(target_dir, e) for e in entries if os.path.isdir(os.path.join(target_dir, e))]
+    subfiles = [os.path.join(target_dir, e) for e in entries if os.path.isfile(os.path.join(target_dir, e))]
+
+    scan_root = target_dir
+    if len(subdirs) == 1 and len(subfiles) == 0:
+        scan_root = subdirs[0]
+
+    # Detect dominant language
+    ext_counts: Dict[str, int] = {}
+    for r, _, files in os.walk(scan_root):
+        for f in files:
+            ext = Path(f).suffix.lower()
+            if ext in [".cs", ".ts", ".tsx", ".js", ".jsx", ".py"]:
+                ext_counts[ext] = ext_counts.get(ext, 0) + 1
+
+    detected_lang = "Multi-Language"
+    if ext_counts:
+        top_ext = max(ext_counts, key=ext_counts.get)
+        if top_ext == ".cs":
+            detected_lang = "C# (.cs)"
+        elif top_ext in [".ts", ".tsx"]:
+            detected_lang = "TypeScript (.ts)"
+        elif top_ext in [".js", ".jsx"]:
+            detected_lang = "JavaScript (.js)"
+        elif top_ext == ".py":
+            detected_lang = "Python (.py)"
+
+    scan_result = load_workspace(scan_root)
+
+    proj_id = f"uploaded_{clean_name}_{int(time.time())}"
+    display_title = project_name.strip() if project_name and project_name.strip() else Path(file.filename).stem.replace("_", " ").title()
+
+    new_sample = ProjectSample(
+        id=proj_id,
+        name=f"📦 {display_title}",
+        language=detected_lang,
+        path=scan_root.replace("\\", "/"),
+        description=f"Uploaded project: {scan_result['total_symbols']} symbols, {scan_result['total_edges']} dependencies."
+    )
+    user_projects.insert(0, new_sample)
+
+    return {
+        "success": True,
+        "sample": new_sample,
+        "workspace": scan_root.replace("\\", "/"),
+        "total_symbols": scan_result["total_symbols"],
+        "total_edges": scan_result["total_edges"],
+        "symbols": scan_result["symbols"]
+    }
 
 @app.get("/api/symbols")
 def get_symbols():
