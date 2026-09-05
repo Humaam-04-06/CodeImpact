@@ -7,6 +7,7 @@ import { ImpactHUD } from "./components/ImpactHUD";
 import { GraphView } from "./components/GraphView";
 import { CodeSandbox } from "./components/CodeSandbox";
 import { PRReportModal } from "./components/PRReportModal";
+import { UploadProjectModal } from "./components/UploadProjectModal";
 import type {
   SymbolNode,
   BlastReport,
@@ -32,6 +33,7 @@ export const App: React.FC = () => {
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"graph" | "sandbox" | "callers">("graph");
   const [isPRModalOpen, setIsPRModalOpen] = useState<boolean>(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
 
   // Fetch graph data from backend
   const refreshGraph = useCallback(async (targetId?: string) => {
@@ -143,6 +145,33 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleProjectLoaded = async (newSample: ProjectSample, newSymbols: SymbolNode[]) => {
+    // Add to samples list if not present
+    setSamples((prev) => {
+      const exists = prev.some((s) => s.path === newSample.path);
+      return exists ? prev : [newSample, ...prev];
+    });
+    setActiveWorkspace(newSample.path);
+    setSymbols(newSymbols);
+
+    const firstSym = newSymbols[0] || null;
+    setSelectedSymbol(firstSym);
+
+    if (firstSym) {
+      try {
+        const impactData = await calculateImpact(firstSym.id);
+        setReport(impactData);
+        await refreshGraph(firstSym.id);
+      } catch (err) {
+        console.error("Failed to calculate impact for project target:", err);
+      }
+    } else {
+      setReport(null);
+      setGraphNodes([]);
+      setGraphEdges([]);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-rose-500/30 selection:text-rose-200">
       {/* Top Navigation */}
@@ -153,6 +182,7 @@ export const App: React.FC = () => {
         onRescan={handleRescan}
         isScanning={isScanning}
         onOpenPRModal={() => setIsPRModalOpen(true)}
+        onOpenUploadModal={() => setIsUploadModalOpen(true)}
         targetSymbolId={selectedSymbol?.id}
       />
 
@@ -302,6 +332,13 @@ export const App: React.FC = () => {
         onClose={() => setIsPRModalOpen(false)}
         symbolId={selectedSymbol?.id || null}
         report={report}
+      />
+
+      {/* Upload & Analyze Project Modal */}
+      <UploadProjectModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onProjectLoaded={handleProjectLoaded}
       />
     </div>
   );

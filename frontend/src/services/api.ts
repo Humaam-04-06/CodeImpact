@@ -102,3 +102,34 @@ export async function exportPRReport(symbolId: string, prTitle?: string): Promis
   if (!res.ok) throw new Error("Failed to export report");
   return res.json();
 }
+
+export async function uploadProjectZip(
+  file: File,
+  projectName?: string
+): Promise<{
+  success: boolean;
+  sample: ProjectSample;
+  workspace: string;
+  total_symbols: number;
+  total_edges: number;
+  symbols: SymbolNode[];
+}> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (projectName) {
+    formData.append("project_name", projectName);
+  }
+
+  const res = await fetch(`${API_BASE}/api/upload-project`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || "Failed to upload and analyze project archive");
+  }
+
+  return res.json();
+}
+

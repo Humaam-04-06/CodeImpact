@@ -23,7 +23,12 @@ import {
   faCircleDot,
   faSliders,
   faBug,
-  faArrowRight
+  faArrowRight,
+  faCloudArrowUp,
+  faFileZipper,
+  faFolderOpen,
+  faXmark,
+  faSpinner
 } from "@fortawesome/free-solid-svg-icons";
 
 import type { SymbolType } from "../types/impact";
@@ -54,7 +59,12 @@ export const ICONS = {
   dot: faCircleDot,
   settings: faSliders,
   bug: faBug,
-  arrowRight: faArrowRight
+  arrowRight: faArrowRight,
+  upload: faCloudArrowUp,
+  zip: faFileZipper,
+  folder: faFolderOpen,
+  close: faXmark,
+  spinner: faSpinner
 };
 
 export function getSymbolIcon(type: SymbolType, isTarget: boolean = false) {

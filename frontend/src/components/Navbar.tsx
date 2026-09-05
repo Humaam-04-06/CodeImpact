@@ -10,6 +10,7 @@ interface NavbarProps {
   onRescan: () => void;
   isScanning: boolean;
   onOpenPRModal: () => void;
+  onOpenUploadModal: () => void;
   targetSymbolId?: string;
 }
 
@@ -20,6 +21,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onRescan,
   isScanning,
   onOpenPRModal,
+  onOpenUploadModal,
   targetSymbolId,
 }) => {
   return (
@@ -64,6 +66,16 @@ export const Navbar: React.FC<NavbarProps> = ({
             ))}
           </select>
         </div>
+
+        {/* Upload Project Button */}
+        <button
+          onClick={onOpenUploadModal}
+          title="Upload Project ZIP or Scan Local Directory"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-cyan-600/90 to-blue-600/90 hover:from-cyan-500 hover:to-blue-500 text-white border border-cyan-500/30 shadow-md shadow-cyan-500/10 transition-all cursor-pointer"
+        >
+          <FontAwesomeIcon icon={ICONS.upload} className="text-xs" />
+          <span className="hidden sm:inline">Upload Project</span>
+        </button>
 
         {/* Rescan Button */}
         <button
