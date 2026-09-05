@@ -1,7 +1,7 @@
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { ICONS } from "../utils/icons";
-import { BlastReport } from "../types/impact";
+import type { BlastReport } from "../types/impact";
 
 interface ImpactHUDProps {
   report: BlastReport | null;

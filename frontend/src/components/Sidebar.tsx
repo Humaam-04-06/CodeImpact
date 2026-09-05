@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { ICONS, getSymbolIcon, getSymbolColor } from "../utils/icons";
-import { SymbolNode, SymbolType } from "../types/impact";
+import type { SymbolNode } from "../types/impact";
 
 interface SidebarProps {
   symbols: SymbolNode[];

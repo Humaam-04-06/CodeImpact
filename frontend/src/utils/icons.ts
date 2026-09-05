@@ -1,11 +1,7 @@
 import {
   faNetworkWired,
-  faGlobe,
   faDatabase,
-  faServer,
   faFlask,
-  faVial,
-  faGear,
   faCogs,
   faBurst,
   faFire,
@@ -30,7 +26,7 @@ import {
   faArrowRight
 } from "@fortawesome/free-solid-svg-icons";
 
-import { SymbolType } from "../types/impact";
+import type { SymbolType } from "../types/impact";
 
 export const ICONS = {
   controller: faNetworkWired,
@@ -39,6 +35,7 @@ export const ICONS = {
   test: faFlask,
   model: faFileCode,
   function: faCode,
+  code: faCode,
   blastTarget: faBurst,
   fire: faFire,
   danger: faTriangleExclamation,

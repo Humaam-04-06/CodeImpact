@@ -1,7 +1,7 @@
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { ICONS } from "../utils/icons";
-import { ProjectSample } from "../types/impact";
+import type { ProjectSample } from "../types/impact";
 
 interface NavbarProps {
   samples: ProjectSample[];
