@@ -5,6 +5,7 @@ import { Navbar } from "./components/Navbar";
 import { Sidebar } from "./components/Sidebar";
 import { ImpactHUD } from "./components/ImpactHUD";
 import { GraphView } from "./components/GraphView";
+import { CodeSandbox } from "./components/CodeSandbox";
 import type {
   SymbolNode,
   BlastReport,
@@ -229,16 +230,14 @@ export const App: React.FC = () => {
             )}
 
             {activeTab === "sandbox" && (
-              <div className="h-full flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-2xl p-8 text-center bg-slate-900/20">
-                <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-2xl mb-4">
-                  <FontAwesomeIcon icon={ICONS.code} />
-                </div>
-                <h3 className="text-base font-bold text-white mb-1">
-                  Monaco "What-If" Sandbox Ready for Phase 7
-                </h3>
-                <p className="text-xs text-slate-400 max-w-md">
-                  In Phase 7, you will be able to alter function parameters live in Monaco Editor and watch compiler-grade breaking change diagnostics update in real-time.
-                </p>
+              <div className="w-full h-full">
+                <CodeSandbox
+                  symbol={selectedSymbol}
+                  onSelectCaller={(callerId) => {
+                    const matched = symbols.find((s) => s.id === callerId);
+                    if (matched) handleSelectSymbol(matched);
+                  }}
+                />
               </div>
             )}
 
