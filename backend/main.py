@@ -140,6 +140,13 @@ def list_samples():
             language="TypeScript (.ts)",
             path="sample_projects/ts_saas_api",
             description="SubscriptionService, BillingController, PaymentGateway, and Unit Tests."
+        ),
+        ProjectSample(
+            id="python_ai_service",
+            name="Python AI Sentiment Microservice",
+            language="Python (.py)",
+            path="sample_projects/python_ai_service",
+            description="ModelService, ApiController, DbLogger, and Unit Tests."
         )
     ]
 
