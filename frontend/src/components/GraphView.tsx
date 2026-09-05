@@ -37,14 +37,14 @@ export const GraphView: React.FC<GraphViewProps> = ({
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
   // Register custom node and edge types
-  const nodeTypes = useMemo(
+  const nodeTypes = useMemo<any>(
     () => ({
       customSymbolNode: CustomSymbolNode,
     }),
     []
   );
 
-  const edgeTypes = useMemo(
+  const edgeTypes = useMemo<any>(
     () => ({
       customRippleEdge: CustomRippleEdge,
       default: CustomRippleEdge,

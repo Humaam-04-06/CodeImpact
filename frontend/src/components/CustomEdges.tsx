@@ -7,7 +7,6 @@ import {
 } from "@xyflow/react";
 
 export const CustomRippleEdge: React.FC<EdgeProps> = ({
-  id,
   sourceX,
   sourceY,
   targetX,

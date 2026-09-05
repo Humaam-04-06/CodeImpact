@@ -1,7 +1,7 @@
 import React, { memo } from "react";
-import { Handle, Position, NodeProps } from "@xyflow/react";
+import { Handle, Position } from "@xyflow/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { ICONS, getSymbolIcon, getSymbolColor } from "../utils/icons";
+import { getSymbolIcon, getSymbolColor } from "../utils/icons";
 import type { SymbolType, Parameter } from "../types/impact";
 
 export interface CustomNodeData {
@@ -24,7 +24,7 @@ export interface CustomNodeData {
   [key: string]: unknown;
 }
 
-export const CustomSymbolNode: React.FC<NodeProps<any>> = memo(({ data, selected }) => {
+export const CustomSymbolNode: React.FC<any> = memo(({ data, selected }) => {
   const nodeData = data as CustomNodeData;
   const {
     id,

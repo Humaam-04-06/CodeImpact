@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { ICONS } from "./utils/icons";
 import { Navbar } from "./components/Navbar";
 import { Sidebar } from "./components/Sidebar";
 import { ImpactHUD } from "./components/ImpactHUD";
+import { GraphView } from "./components/GraphView";
 import type {
   SymbolNode,
   BlastReport,
@@ -13,6 +14,7 @@ import {
   fetchSamples,
   scanWorkspace,
   calculateImpact,
+  fetchGraphData,
 } from "./services/api";
 
 export const App: React.FC = () => {
@@ -21,9 +23,26 @@ export const App: React.FC = () => {
   const [symbols, setSymbols] = useState<SymbolNode[]>([]);
   const [selectedSymbol, setSelectedSymbol] = useState<SymbolNode | null>(null);
   const [report, setReport] = useState<BlastReport | null>(null);
+  const [graphNodes, setGraphNodes] = useState<any[]>([]);
+  const [graphEdges, setGraphEdges] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isGraphLoading, setIsGraphLoading] = useState<boolean>(false);
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"graph" | "sandbox" | "callers">("graph");
+
+  // Fetch graph data from backend
+  const refreshGraph = useCallback(async (targetId?: string) => {
+    try {
+      setIsGraphLoading(true);
+      const graphData = await fetchGraphData(targetId);
+      setGraphNodes(graphData.nodes);
+      setGraphEdges(graphData.edges);
+    } catch (err) {
+      console.error("Failed to load graph data:", err);
+    } finally {
+      setIsGraphLoading(false);
+    }
+  }, []);
 
   // Load initial samples and workspace
   useEffect(() => {
@@ -36,12 +55,14 @@ export const App: React.FC = () => {
         const scanData = await scanWorkspace("sample_projects/csharp_ecommerce");
         setSymbols(scanData.symbols);
 
-        // Auto-select UserService.GetUser as the premier demo symbol
-        const defaultTarget = scanData.symbols.find((s) => s.id === "UserService.GetUser") || scanData.symbols[0];
+        const defaultTarget =
+          scanData.symbols.find((s) => s.id === "UserService.GetUser") || scanData.symbols[0];
+
         if (defaultTarget) {
           setSelectedSymbol(defaultTarget);
           const impactData = await calculateImpact(defaultTarget.id);
           setReport(impactData);
+          await refreshGraph(defaultTarget.id);
         }
       } catch (err) {
         console.error("Initialization error:", err);
@@ -50,7 +71,7 @@ export const App: React.FC = () => {
       }
     };
     init();
-  }, []);
+  }, [refreshGraph]);
 
   // Handle symbol selection
   const handleSelectSymbol = async (sym: SymbolNode) => {
@@ -58,10 +79,22 @@ export const App: React.FC = () => {
     try {
       const impactData = await calculateImpact(sym.id);
       setReport(impactData);
+      await refreshGraph(sym.id);
     } catch (err) {
       console.error("Failed to load impact report:", err);
     }
   };
+
+  // Handle node clicked directly on the graph canvas
+  const handleGraphNodeClick = useCallback(
+    async (nodeId: string) => {
+      const matched = symbols.find((s) => s.id === nodeId);
+      if (matched) {
+        handleSelectSymbol(matched);
+      }
+    },
+    [symbols]
+  );
 
   // Switch workspace
   const handleSelectSample = async (sample: ProjectSample) => {
@@ -75,9 +108,12 @@ export const App: React.FC = () => {
         setSelectedSymbol(firstSym);
         const impactData = await calculateImpact(firstSym.id);
         setReport(impactData);
+        await refreshGraph(firstSym.id);
       } else {
         setSelectedSymbol(null);
         setReport(null);
+        setGraphNodes([]);
+        setGraphEdges([]);
       }
     } catch (err) {
       console.error("Failed to switch workspace:", err);
@@ -95,6 +131,7 @@ export const App: React.FC = () => {
       if (selectedSymbol) {
         const impactData = await calculateImpact(selectedSymbol.id);
         setReport(impactData);
+        await refreshGraph(selectedSymbol.id);
       }
     } catch (err) {
       console.error("Rescan failed:", err);
@@ -132,7 +169,7 @@ export const App: React.FC = () => {
           <ImpactHUD report={report} isLoading={isLoading} />
 
           {/* Sub Navigation Tabs */}
-          <div className="flex items-center justify-between px-5 pt-3 border-b border-slate-800/80 bg-slate-950/50">
+          <div className="flex items-center justify-between px-5 pt-3 border-b border-slate-800/80 bg-slate-950/50 flex-shrink-0">
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setActiveTab("graph")}
@@ -173,40 +210,21 @@ export const App: React.FC = () => {
 
             <div className="text-[11px] font-mono text-slate-500 hidden sm:flex items-center gap-2">
               <FontAwesomeIcon icon={ICONS.dot} className="text-emerald-400 text-[8px] animate-ping" />
-              <span>AST Call Graph Active</span>
+              <span>{graphNodes.length} Nodes • {graphEdges.length} Edges</span>
             </div>
           </div>
 
           {/* Active Tab Content Area */}
-          <div className="flex-1 overflow-auto p-5 relative">
+          <div className="flex-1 overflow-hidden p-4 relative">
             {activeTab === "graph" && (
-              <div className="h-full flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-2xl p-8 text-center bg-slate-900/20">
-                <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 text-2xl mb-4 blast-ripple">
-                  <FontAwesomeIcon icon={ICONS.blastTarget} />
-                </div>
-                <h3 className="text-base font-bold text-white mb-1">
-                  Graph Canvas Ready for Phase 6
-                </h3>
-                <p className="text-xs text-slate-400 max-w-md mb-4">
-                  Currently targeting <strong className="text-white font-mono">{selectedSymbol?.id || "None"}</strong>.
-                  In Phase 6, this canvas renders the force-directed call graph with animated SVG energy ripples.
-                </p>
-                {report && (
-                  <div className="flex flex-wrap items-center justify-center gap-2 text-xs font-mono">
-                    <span className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-300">
-                      {report.summary.total_dependents} Callers
-                    </span>
-                    <span className="px-2.5 py-1 rounded bg-purple-950/40 border border-purple-800/40 text-purple-300">
-                      {report.summary.controllers_count} Controllers
-                    </span>
-                    <span className="px-2.5 py-1 rounded bg-amber-950/40 border border-amber-800/40 text-amber-300">
-                      {report.summary.db_ops_count} Database Ops
-                    </span>
-                    <span className="px-2.5 py-1 rounded bg-emerald-950/40 border border-emerald-800/40 text-emerald-300">
-                      {report.summary.tests_count} Tests
-                    </span>
-                  </div>
-                )}
+              <div className="w-full h-full">
+                <GraphView
+                  nodesData={graphNodes}
+                  edgesData={graphEdges}
+                  selectedSymbolId={selectedSymbol?.id || null}
+                  onSelectNode={handleGraphNodeClick}
+                  isLoading={isGraphLoading}
+                />
               </div>
             )}
 
@@ -225,7 +243,7 @@ export const App: React.FC = () => {
             )}
 
             {activeTab === "callers" && report && (
-              <div className="space-y-4 max-w-4xl mx-auto">
+              <div className="h-full overflow-y-auto space-y-4 max-w-4xl mx-auto pr-2">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300 m-0">
                     Upstream Dependent Callers ({report.affected_nodes.length})
@@ -237,9 +255,10 @@ export const App: React.FC = () => {
 
                 <div className="grid gap-2">
                   {report.affected_nodes.map((node) => (
-                    <div
+                    <button
                       key={node.id}
-                      className="p-3 bg-slate-900/60 border border-slate-800/80 rounded-xl flex items-center justify-between hover:border-slate-700 transition-colors"
+                      onClick={() => handleSelectSymbol(node)}
+                      className="w-full text-left p-3 bg-slate-900/60 border border-slate-800/80 rounded-xl flex items-center justify-between hover:border-slate-700 transition-colors group cursor-pointer"
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300 text-xs">
@@ -248,7 +267,9 @@ export const App: React.FC = () => {
                           />
                         </div>
                         <div>
-                          <div className="text-xs font-bold text-white font-mono">{node.id}</div>
+                          <div className="text-xs font-bold text-white font-mono group-hover:text-cyan-300 transition-colors">
+                            {node.id}
+                          </div>
                           <div className="text-[11px] text-slate-400 font-mono">
                             {node.file_path}:{node.line_number}
                           </div>
@@ -265,7 +286,7 @@ export const App: React.FC = () => {
                           {node.calls.length} Invocations
                         </span>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
