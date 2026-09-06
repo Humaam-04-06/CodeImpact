@@ -30,9 +30,17 @@ export const Navbar: React.FC<NavbarProps> = ({
     <header className="h-16 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md px-5 flex items-center justify-between z-30 sticky top-0">
       {/* Brand Logo */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 via-purple-600 to-cyan-500 p-[1px] shadow-lg shadow-rose-500/20">
-          <div className="w-full h-full bg-slate-950 rounded-[11px] flex items-center justify-center">
-            <FontAwesomeIcon icon={ICONS.blastTarget} className="text-rose-400 text-lg animate-pulse" />
+        <div className="relative group cursor-pointer">
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-rose-500 via-purple-600 to-cyan-500 rounded-xl blur-sm opacity-70 group-hover:opacity-100 transition duration-300"></div>
+          <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-slate-950 border border-slate-800/80 flex items-center justify-center">
+            <img
+              src="/logo.png"
+              alt="CodeImpact Logo"
+              className="w-full h-full object-cover transform group-hover:scale-105 transition duration-300"
+              onError={(e) => {
+                e.currentTarget.src = "/logo.svg";
+              }}
+            />
           </div>
         </div>
         <div>
