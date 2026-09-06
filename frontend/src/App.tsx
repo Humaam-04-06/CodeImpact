@@ -290,54 +290,72 @@ export const App: React.FC = () => {
               </div>
             )}
 
-            {activeTab === "callers" && report && (
-              <div className="h-full overflow-y-auto space-y-4 max-w-4xl mx-auto pr-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300 m-0">
-                    Upstream Dependent Callers ({report.affected_nodes.length})
-                  </h3>
+            {activeTab === "callers" && (
+              report ? (
+                <div className="h-full overflow-y-auto space-y-4 max-w-4xl mx-auto pr-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300 m-0">
+                      Upstream Dependent Callers ({report.affected_nodes.length})
+                    </h3>
+                    <span className="text-xs font-mono text-slate-500">
+                      Ranked by Blast Radius
+                    </span>
+                  </div>
+
+                  {report.affected_nodes.length === 0 ? (
+                    <div className="h-48 flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-2xl p-6 text-center bg-slate-900/20">
+                      <FontAwesomeIcon icon={ICONS.check} className="text-emerald-400 text-2xl mb-2" />
+                      <span className="text-xs font-mono text-slate-400">
+                        Zero upstream callers detected — this symbol has an isolated footprint!
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="grid gap-2">
+                      {report.affected_nodes.map((node) => (
+                        <button
+                          key={node.id}
+                          onClick={() => handleSelectSymbol(node)}
+                          className="w-full text-left p-3 bg-slate-900/60 border border-slate-800/80 rounded-xl flex items-center justify-between hover:border-slate-700 transition-colors group cursor-pointer"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300 text-xs">
+                              <FontAwesomeIcon
+                                icon={node.symbol_type === "controller" ? ICONS.controller : ICONS.service}
+                              />
+                            </div>
+                            <div>
+                              <div className="text-xs font-bold text-white font-mono group-hover:text-cyan-300 transition-colors">
+                                {node.id}
+                              </div>
+                              <div className="text-[11px] text-slate-400 font-mono">
+                                {node.file_path}:{node.line_number}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {node.http_method && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-900/50 text-purple-300 border border-purple-700/50">
+                                {node.http_method} ENDPOINT
+                              </span>
+                            )}
+                            <span className="text-[10px] font-mono text-slate-500 bg-slate-800/80 px-2 py-0.5 rounded">
+                              {node.calls.length} Invocations
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-2xl p-8 text-center bg-slate-900/20">
+                  <FontAwesomeIcon icon={ICONS.controller} className="text-slate-600 text-3xl mb-2" />
                   <span className="text-xs font-mono text-slate-500">
-                    Ranked by Blast Radius
+                    Select a symbol from the left sidebar to view its impacted callers
                   </span>
                 </div>
-
-                <div className="grid gap-2">
-                  {report.affected_nodes.map((node) => (
-                    <button
-                      key={node.id}
-                      onClick={() => handleSelectSymbol(node)}
-                      className="w-full text-left p-3 bg-slate-900/60 border border-slate-800/80 rounded-xl flex items-center justify-between hover:border-slate-700 transition-colors group cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300 text-xs">
-                          <FontAwesomeIcon
-                            icon={node.symbol_type === "controller" ? ICONS.controller : ICONS.service}
-                          />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-white font-mono group-hover:text-cyan-300 transition-colors">
-                            {node.id}
-                          </div>
-                          <div className="text-[11px] text-slate-400 font-mono">
-                            {node.file_path}:{node.line_number}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {node.http_method && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-900/50 text-purple-300 border border-purple-700/50">
-                            {node.http_method} ENDPOINT
-                          </span>
-                        )}
-                        <span className="text-[10px] font-mono text-slate-500 bg-slate-800/80 px-2 py-0.5 rounded">
-                          {node.calls.length} Invocations
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              )
             )}
           </div>
         </main>
