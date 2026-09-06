@@ -166,7 +166,7 @@ export const CodeSandbox: React.FC<CodeSandboxProps> = ({ symbol }) => {
               Simulated Function Signature
             </label>
             <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 font-mono text-[11px] text-cyan-300 break-all leading-relaxed">
-              <span className="text-purple-400">{returnType}</span>{" "}
+              <span className="text-purple-400 font-bold">{returnType || "void"}</span>{" "}
               <span className="text-white font-bold">{symbol.name}</span>(
               {parameters.map((p, idx) => (
                 <span key={idx}>
@@ -179,6 +179,32 @@ export const CodeSandbox: React.FC<CodeSandboxProps> = ({ symbol }) => {
                 </span>
               ))}
               )
+            </div>
+          </div>
+
+          {/* Return Type Modifier */}
+          <div>
+            <label className="text-[10px] font-mono uppercase font-bold text-slate-400 tracking-wider block mb-1">
+              Simulated Return Type
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={returnType}
+                onChange={(e) => setReturnType(e.target.value)}
+                placeholder="e.g. Task<UserDto> or void"
+                className="flex-1 px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-800 rounded-lg text-purple-300 font-mono focus:outline-none focus:border-cyan-500/50"
+              />
+              {returnType !== (symbol.return_type || "void") && (
+                <button
+                  type="button"
+                  onClick={() => setReturnType(symbol.return_type || "void")}
+                  className="px-2 py-1.5 text-[11px] font-mono text-slate-400 hover:text-white bg-slate-800 rounded-lg border border-slate-700 transition-colors cursor-pointer"
+                  title="Revert return type to original"
+                >
+                  Revert
+                </button>
+              )}
             </div>
           </div>
 
