@@ -24,9 +24,20 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isBackendOnline, setIsBackendOnline] = useState<boolean | null>(null);
 
-  // Check backend server status when modal opens
+  const handleClose = () => {
+    setSelectedFile(null);
+    setProjectName("");
+    setLocalPath("");
+    setErrorMsg(null);
+    onClose();
+  };
+
+  // Reset form and check backend server status whenever modal opens
   useEffect(() => {
     if (isOpen) {
+      setSelectedFile(null);
+      setProjectName("");
+      setLocalPath("");
       setErrorMsg(null);
       fetchHealth()
         .then(() => setIsBackendOnline(true))
@@ -55,9 +66,8 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
       const file = files[0];
       if (file.name.toLowerCase().endsWith(".zip")) {
         setSelectedFile(file);
-        if (!projectName) {
-          setProjectName(file.name.replace(/\.zip$/i, ""));
-        }
+        const derived = file.name.replace(/\.zip$/i, "").replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+        setProjectName(derived);
       } else {
         setErrorMsg("Please upload a .zip archive file.");
       }
@@ -70,9 +80,8 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
       const file = e.target.files[0];
       if (file.name.toLowerCase().endsWith(".zip")) {
         setSelectedFile(file);
-        if (!projectName) {
-          setProjectName(file.name.replace(/\.zip$/i, ""));
-        }
+        const derived = file.name.replace(/\.zip$/i, "").replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+        setProjectName(derived);
       } else {
         setErrorMsg("Please upload a .zip archive file.");
       }
@@ -92,7 +101,7 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
       const res = await uploadProjectZip(selectedFile, projectName.trim());
       if (res.success && res.sample) {
         onProjectLoaded(res.sample, res.symbols);
-        onClose();
+        handleClose();
       }
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to upload and scan project archive.");
@@ -124,8 +133,8 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
         path: cleanPath.replace(/\\/g, "/"),
         description: `Local project: ${res.total_symbols} symbols, ${res.total_edges} dependencies.`
       };
-      onProjectLoaded(customSample, res.symbols);
-      onClose();
+      onProjectLoaded(res.sample || customSample, res.symbols);
+      handleClose();
     } catch (err: any) {
       setErrorMsg(err.message || "Path not found or unable to parse codebase.");
     } finally {
@@ -152,7 +161,7 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             disabled={isLoading}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
           >
@@ -345,7 +354,7 @@ export const UploadProjectModal: React.FC<UploadProjectModalProps> = ({
         {/* Modal Footer */}
         <div className="px-6 py-3.5 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             disabled={isLoading}
             className="px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
           >
