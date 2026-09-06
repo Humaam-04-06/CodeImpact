@@ -23,6 +23,7 @@ import {
 export const App: React.FC = () => {
   const [samples, setSamples] = useState<ProjectSample[]>([]);
   const [activeWorkspace, setActiveWorkspace] = useState<string>("sample_projects/csharp_ecommerce");
+  const [activeProjectId, setActiveProjectId] = useState<string>("csharp_ecommerce");
   const [symbols, setSymbols] = useState<SymbolNode[]>([]);
   const [selectedSymbol, setSelectedSymbol] = useState<SymbolNode | null>(null);
   const [report, setReport] = useState<BlastReport | null>(null);
@@ -56,6 +57,7 @@ export const App: React.FC = () => {
         setIsLoading(true);
         const sampleList = await fetchSamples();
         setSamples(sampleList);
+        setActiveProjectId("csharp_ecommerce");
 
         const scanData = await scanWorkspace("sample_projects/csharp_ecommerce");
         setSymbols(scanData.symbols);
@@ -103,6 +105,7 @@ export const App: React.FC = () => {
 
   // Switch workspace
   const handleSelectSample = async (sample: ProjectSample) => {
+    setActiveProjectId(sample.id);
     setActiveWorkspace(sample.path);
     setIsScanning(true);
     try {
@@ -146,11 +149,24 @@ export const App: React.FC = () => {
   };
 
   const handleProjectLoaded = async (newSample: ProjectSample, newSymbols: SymbolNode[]) => {
-    // Add to samples list if not present
-    setSamples((prev) => {
-      const exists = prev.some((s) => s.path === newSample.path);
-      return exists ? prev : [newSample, ...prev];
-    });
+    try {
+      // Re-fetch fresh deduplicated samples list from backend
+      const freshSamples = await fetchSamples();
+      setSamples(freshSamples);
+    } catch {
+      // Fallback: update local list deduplicating by ID, name, or path
+      setSamples((prev) => {
+        const filtered = prev.filter(
+          (s) =>
+            s.id !== newSample.id &&
+            s.name.trim().toLowerCase() !== newSample.name.trim().toLowerCase() &&
+            s.path.replace(/\\/g, "/").toLowerCase() !== newSample.path.replace(/\\/g, "/").toLowerCase()
+        );
+        return [newSample, ...filtered];
+      });
+    }
+
+    setActiveProjectId(newSample.id);
     setActiveWorkspace(newSample.path);
     setSymbols(newSymbols);
 
@@ -178,6 +194,7 @@ export const App: React.FC = () => {
       <Navbar
         samples={samples}
         activeWorkspace={activeWorkspace}
+        activeProjectId={activeProjectId}
         onSelectSample={handleSelectSample}
         onRescan={handleRescan}
         isScanning={isScanning}

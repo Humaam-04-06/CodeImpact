@@ -26,6 +26,7 @@ export async function scanWorkspace(workspacePath: string): Promise<{
   total_symbols: number;
   total_edges: number;
   symbols: SymbolNode[];
+  sample?: ProjectSample;
 }> {
   try {
     const res = await fetch(`${API_BASE}/api/scan`, {

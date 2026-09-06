@@ -6,6 +6,7 @@ import type { ProjectSample } from "../types/impact";
 interface NavbarProps {
   samples: ProjectSample[];
   activeWorkspace: string;
+  activeProjectId?: string;
   onSelectSample: (sample: ProjectSample) => void;
   onRescan: () => void;
   isScanning: boolean;
@@ -17,6 +18,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   samples,
   activeWorkspace,
+  activeProjectId,
   onSelectSample,
   onRescan,
   isScanning,
@@ -52,15 +54,26 @@ export const Navbar: React.FC<NavbarProps> = ({
           <FontAwesomeIcon icon={ICONS.tree} className="text-slate-400 text-xs" />
           <span className="text-slate-500">Project:</span>
           <select
-            value={activeWorkspace}
+            value={
+              activeProjectId ||
+              samples.find(
+                (s) =>
+                  s.path.replace(/\\/g, "/").toLowerCase() ===
+                  activeWorkspace.replace(/\\/g, "/").toLowerCase()
+              )?.id ||
+              samples[0]?.id ||
+              ""
+            }
             onChange={(e) => {
-              const selected = samples.find((s) => s.path === e.target.value);
+              const selected = samples.find(
+                (s) => s.id === e.target.value || s.path === e.target.value
+              );
               if (selected) onSelectSample(selected);
             }}
             className="bg-transparent text-white font-medium focus:outline-none cursor-pointer"
           >
             {samples.map((s) => (
-              <option key={s.id} value={s.path} className="bg-slate-900 text-white">
+              <option key={s.id} value={s.id} className="bg-slate-900 text-white">
                 {s.name} ({s.language})
               </option>
             ))}
