@@ -125,3 +125,53 @@ def test_upload_invalid_file():
     assert res.status_code == 400
     assert "Only .zip archive files are supported" in res.json()["detail"]
 
+def test_upload_deduplication_and_multiple_projects():
+    # Upload first project
+    buf1 = io.BytesIO()
+    with zipfile.ZipFile(buf1, "w") as z:
+        z.writestr("app.py", "def first_fn(): pass")
+    buf1.seek(0)
+    res1 = client.post(
+        "/api/upload-project",
+        files={"file": ("first_project.zip", buf1, "application/zip")},
+        data={"project_name": "Project Alpha"}
+    )
+    assert res1.status_code == 200
+
+    # Upload same project again with same name (should deduplicate, not duplicate)
+    buf2 = io.BytesIO()
+    with zipfile.ZipFile(buf2, "w") as z:
+        z.writestr("app.py", "def first_fn(): pass")
+    buf2.seek(0)
+    res2 = client.post(
+        "/api/upload-project",
+        files={"file": ("first_project.zip", buf2, "application/zip")},
+        data={"project_name": "Project Alpha"}
+    )
+    assert res2.status_code == 200
+
+    # Upload second distinct project
+    buf3 = io.BytesIO()
+    with zipfile.ZipFile(buf3, "w") as z:
+        z.writestr("app.py", "def second_fn(): pass")
+    buf3.seek(0)
+    res3 = client.post(
+        "/api/upload-project",
+        files={"file": ("second_project.zip", buf3, "application/zip")},
+        data={"project_name": "Project Beta"}
+    )
+    assert res3.status_code == 200
+
+    # Verify samples list
+    samples_res = client.get("/api/samples")
+    assert samples_res.status_code == 200
+    samples = samples_res.json()
+    
+    alpha_count = sum(1 for s in samples if "Project Alpha" in s["name"])
+    beta_count = sum(1 for s in samples if "Project Beta" in s["name"])
+    assert alpha_count == 1, "Project Alpha should be deduplicated to exactly 1 entry"
+    assert beta_count == 1, "Project Beta should exist as 1 entry"
+    # Project Beta should be at index 0 (most recent)
+    assert "Project Beta" in samples[0]["name"]
+
+

@@ -200,16 +200,33 @@ def scan_workspace(req: ScanRequest):
     
     # Auto-register newly scanned custom directory into user_projects if not known
     normalized_path = req.workspace_path.replace("\\", "/").rstrip("/")
-    known_paths = {s.path.replace("\\", "/").rstrip("/") for s in (DEFAULT_SAMPLES + user_projects)}
-    if normalized_path not in known_paths:
-        base_name = os.path.basename(normalized_path) or "Custom Project"
-        user_projects.insert(0, ProjectSample(
+    base_name = os.path.basename(normalized_path) or "Custom Project"
+    display_title = f"📁 {base_name}"
+
+    existing = None
+    for s in (user_projects + DEFAULT_SAMPLES):
+        if s.path.replace("\\", "/").rstrip("/").lower() == normalized_path.lower():
+            existing = s
+            break
+
+    if not existing:
+        new_sample = ProjectSample(
             id=f"custom_{int(time.time())}",
-            name=f"📁 {base_name}",
+            name=display_title,
             language="Auto-Detected",
             path=normalized_path,
             description=f"Local codebase: {result['total_symbols']} symbols, {result['total_edges']} dependencies."
-        ))
+        )
+        # Deduplicate user_projects by path or display name
+        user_projects[:] = [
+            p for p in user_projects
+            if p.path.replace("\\", "/").rstrip("/").lower() != normalized_path.lower()
+            and p.name.strip().lower() != display_title.strip().lower()
+        ]
+        user_projects.insert(0, new_sample)
+        result["sample"] = new_sample
+    else:
+        result["sample"] = existing
         
     return result
 
@@ -287,14 +304,21 @@ async def upload_project(
 
     proj_id = f"uploaded_{clean_name}_{int(time.time())}"
     display_title = project_name.strip() if project_name and project_name.strip() else Path(file.filename).stem.replace("_", " ").title()
+    proj_name_formatted = f"📦 {display_title}"
 
     new_sample = ProjectSample(
         id=proj_id,
-        name=f"📦 {display_title}",
+        name=proj_name_formatted,
         language=detected_lang,
         path=scan_root.replace("\\", "/"),
         description=f"Uploaded project: {scan_result['total_symbols']} symbols, {scan_result['total_edges']} dependencies."
     )
+    # Deduplicate: Remove any existing project in user_projects that has the exact same display name or path
+    user_projects[:] = [
+        p for p in user_projects
+        if p.name.strip().lower() != proj_name_formatted.strip().lower()
+        and p.path.replace("\\", "/").rstrip("/").lower() != scan_root.replace("\\", "/").rstrip("/").lower()
+    ]
     user_projects.insert(0, new_sample)
 
     return {
