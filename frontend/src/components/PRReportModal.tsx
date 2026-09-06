@@ -17,15 +17,25 @@ export const PRReportModal: React.FC<PRReportModalProps> = ({
   symbolId,
   report,
 }) => {
-  const [prTitle, setPrTitle] = useState("refactor: update UserService.GetUser contract");
+  const [prTitle, setPrTitle] = useState(
+    symbolId ? `refactor: update ${symbolId} contract` : "Feature / Refactoring Update"
+  );
   const [markdown, setMarkdown] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<"preview" | "raw">("preview");
 
+  // Sync title when active symbol changes or modal opens
+  useEffect(() => {
+    if (symbolId) {
+      setPrTitle(`refactor: update ${symbolId} contract`);
+    }
+  }, [symbolId, isOpen]);
+
+  // Debounced report loading to prevent excessive server requests while typing
   useEffect(() => {
     if (isOpen && symbolId) {
-      const loadReport = async () => {
+      const handler = setTimeout(async () => {
         setIsLoading(true);
         try {
           const res = await exportPRReport(symbolId, prTitle);
@@ -35,8 +45,9 @@ export const PRReportModal: React.FC<PRReportModalProps> = ({
         } finally {
           setIsLoading(false);
         }
-      };
-      loadReport();
+      }, 300);
+
+      return () => clearTimeout(handler);
     }
   }, [isOpen, symbolId, prTitle]);
 
