@@ -370,6 +370,7 @@ class ASTParserEngine:
                     symbol_type=st,
                     class_name=class_name,
                     parameters=params,
+                    return_type=item.get("return_type"),
                     language="typescript" if is_ts else "javascript",
                     source_code=item.get("source_code", ""),
                     calls=calls

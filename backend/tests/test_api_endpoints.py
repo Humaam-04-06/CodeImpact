@@ -174,4 +174,36 @@ def test_upload_deduplication_and_multiple_projects():
     # Project Beta should be at index 0 (most recent)
     assert "Project Beta" in samples[0]["name"]
 
+def test_js_ts_arrow_functions_and_return_types():
+    # Test that arrow functions, function expressions, and return types are extracted properly
+    buf = io.BytesIO()
+    js_code = """
+    export const calculateDiscount = (price: number, rate: number): number => {
+        return price * rate;
+    };
+    export const logPayment = function(id: string): void {
+        calculateDiscount(100, 0.2);
+    };
+    """
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("services/discountService.ts", js_code)
+    buf.seek(0)
+
+    res = client.post(
+        "/api/upload-project",
+        files={"file": ("ts_arrow_test.zip", buf, "application/zip")},
+        data={"project_name": "TS Arrow Project"}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["total_symbols"] >= 2
+    sym_names = [s["name"] for s in data["symbols"]]
+    assert "calculateDiscount" in sym_names
+    assert "logPayment" in sym_names
+
+    calc_sym = next(s for s in data["symbols"] if s["name"] == "calculateDiscount")
+    assert calc_sym["return_type"] == "number"
+    assert len(calc_sym["parameters"]) == 2
+    assert calc_sym["parameters"][0]["name"] == "price"
+
 
