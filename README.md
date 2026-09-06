@@ -21,6 +21,32 @@
 
 ---
 
+## 📝 Description
+
+> **Short Description (GitHub About)**:  
+> *An intelligent AST-powered Code Knowledge Graph &amp; Blast Radius Analyzer that maps cascading dependencies, flags breaking API/database mutations, detects untested danger zones, and simulates 'what-if' signature changes before deployment.*
+
+**CodeImpact** is a next-generation static analysis and architecture observability engine. Modern distributed and modular codebases suffer from hidden dependency chains where altering a single function signature can silently break downstream services, external HTTP controllers, database repositories, or untested business logic. 
+
+CodeImpact solves this by ingesting multi-language codebases (C#, TypeScript, JavaScript, Python), parsing Abstract Syntax Trees (ASTs), building a directed Code Knowledge Graph (CKG), and calculating an actionable 0–100 blast radius risk score with live Monaco-powered simulation before code is merged.
+
+---
+
+## 🏷️ Repository Tags & Topics
+
+```text
+dependency-analyzer, blast-radius, code-knowledge-graph, static-analysis, ast-parser, impact-analysis, software-architecture, developer-tools, refactoring, code-quality, pull-request-card, monaco-editor, xyflow, react-flow, fastapi, python3-12, react19, typescript, csharp, tree-sitter, codeimpact
+```
+
+| Category | Tags &amp; Keywords |
+| :--- | :--- |
+| **Core Domain** | `dependency-analyzer` • `blast-radius` • `code-knowledge-graph` • `static-analysis` • `ast-parser` • `impact-analysis` |
+| **Languages &amp; Runtimes** | `python3-12` • `fastapi` • `react19` • `typescript` • `csharp` • `javascript` • `node-ast` • `vite` • `tailwindcss` |
+| **Graph &amp; Visualization** | `networkx` • `xyflow` • `react-flow` • `force-directed-graph` • `data-visualization` |
+| **Dev Tooling &amp; DX** | `monaco-editor` • `developer-tools` • `refactoring` • `code-quality` • `code-review` • `pull-request-card` |
+
+---
+
 ## 📖 Overview
 
 **CodeImpact** is an AST-powered developer analysis platform that parses source code, constructs a **Code Knowledge Graph (CKG)**, and calculates the complete blast radius of modifying any function, method, or contract **before** deployment or code review.
